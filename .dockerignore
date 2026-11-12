@@ -1,0 +1,25 @@
+# dependências e saída de build são geradas dentro da imagem
+node_modules
+dist
+coverage
+
+# nunca mandar segredo para o contexto do build
+.env
+.env.*
+!.env.example
+
+# o que não é necessário para compilar nem para rodar
+.git
+.github
+.gitignore
+.vscode
+tests
+vitest.config.ts
+Dockerfile
+.dockerignore
+*.md
+*.log
+
+# de docs/ só entra a especificação dos eventos (o serviço lê o asyncapi.yaml na subida)
+docs/*
+!docs/*.yaml
