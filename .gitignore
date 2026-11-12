@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+
+# variáveis de ambiente locais (podem ter senha e connection string) nunca vão para o repositório
+.env
+.env.*
+!.env.example
+
+# dados do Azurite (emulador da fila), quando ele roda a partir desta pasta
+.azurite/
+__azurite_db_*.json
+__blobstorage__/
+__queuestorage__/
+
+*.log
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

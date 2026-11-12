@@ -1,0 +1,43 @@
+{
+  "name": "pjbl-ms-pedidos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Microserviço de Pedidos do Conecta Store (PJBL) - Node + TypeScript + Azure SQL, com Transactional Outbox publicando em Azure Storage Queue.",
+  "main": "dist/main.js",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:arch": "vitest run tests/architecture"
+  },
+  "dependencies": {
+    "@azure/storage-queue": "^12.28.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "mssql": "^11.0.1",
+    "pino": "^9.9.0",
+    "pino-http": "^10.5.0",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.8.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/mssql": "^9.1.7",
+    "@types/node": "^22.18.0",
+    "@types/supertest": "^6.0.3",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.1.4",
+    "tsx": "^4.20.5",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
