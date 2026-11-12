@@ -282,7 +282,7 @@ Nenhum segredo fica no repositório. O `.env.example` só tem valores fictícios
 Precisa de **Node.js 22 ou mais novo**.
 
 ```bash
-git clone https://github.com/{{GITHUB_USER}}/pjbl-ms-pedidos.git
+git clone https://github.com/devinigarcia/pjbl-ms-pedidos.git
 cd pjbl-ms-pedidos
 npm install
 ```
@@ -468,10 +468,10 @@ Para o segundo job funcionar, cadastre no repositório (Settings → Secrets and
 | OpenAPI (JSON) | `{{URL_MS_PEDIDOS}}/openapi.json` |
 | Saúde do serviço | `{{URL_MS_PEDIDOS}}/health` |
 | Imagem no Docker Hub | `https://hub.docker.com/r/{{DOCKERHUB_USER}}/pjbl-ms-pedidos` |
-| Código | `https://github.com/{{GITHUB_USER}}/pjbl-ms-pedidos` |
-| Aplicação (frontend) | `{{URL_FRONTEND}}` |
+| Código | `https://github.com/devinigarcia/pjbl-ms-pedidos` |
+| Aplicação (frontend) | `https://devinigarcia.github.io/pjbl-microfrontend` |
 
-Os outros repositórios do projeto: `pjbl-microfrontend`, `pjbl-bff`, `pjbl-ms-produtos`, `pjbl-function` e `pjbl-arquitetura` (ARC42, C4 e scripts de implantação), todos em `https://github.com/{{GITHUB_USER}}`.
+Os outros repositórios do projeto: `pjbl-microfrontend`, `pjbl-bff`, `pjbl-ms-produtos`, `pjbl-function` e `pjbl-arquitetura` (ARC42, C4 e scripts de implantação), todos em `https://github.com/devinigarcia`.
 
 ## Alunos
 
