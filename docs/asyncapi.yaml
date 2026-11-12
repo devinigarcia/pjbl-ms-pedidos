@@ -1,0 +1,310 @@
+asyncapi: 2.6.0
+id: 'urn:conecta-store:ms-pedidos:eventos'
+
+info:
+  title: Conecta Store — Eventos de Pedido
+  version: 1.0.0
+  description: |
+    Eventos publicados pelo **ms-pedidos** quando um pedido é criado ou cancelado.
+    É o "Swagger de eventos" do projeto: o contrato das mensagens que saem do microserviço de pedidos
+    e são consumidas pela **Azure Function** `processOrderEvent`, que atualiza o estoque no ms-produtos.
+
+    ### Como o evento sai do ms-pedidos (Transactional Outbox)
+
+    1. `POST /orders` (ou o cancelamento em `PATCH /orders/{id}/status`) grava o pedido **e** uma linha na
+       tabela `OutboxMessages` **na mesma transação** do Azure SQL. Ou gravam os dois, ou nenhum.
+    2. Assim que a transação é confirmada, o *relay* do serviço lê as mensagens pendentes e publica cada uma
+       na fila `order-events`. Se a publicação falhar, ele registra o erro (`LastError`), soma a tentativa
+       (`Attempts`) e tenta de novo a cada `OUTBOX_INTERVAL_MS` (3 segundos por padrão).
+    3. Depois que a fila confirma o recebimento, a mensagem é marcada com `ProcessedAt`.
+
+    `GET /events` mostra o outbox com a situação de cada mensagem (`PUBLICADO`, `PENDENTE` ou `FALHOU`) e
+    `POST /events/dispatch` força uma rodada do relay.
+
+    ### Garantias
+
+    - **Entrega pelo menos uma vez (at-least-once).** Se o serviço cair depois de publicar e antes de marcar
+      `ProcessedAt`, a mesma mensagem é publicada de novo. Por isso todo consumidor precisa ser **idempotente**:
+      use o `eventId` para reconhecer repetição.
+    - **Ordem não é garantida.** A Azure Storage Queue não promete ordem de entrega.
+    - **Rastreamento.** O campo `correlationId` é o `x-correlation-id` da requisição HTTP que gerou o evento.
+
+    ### O que o consumidor faz
+
+    | Evento | Ação da Function no ms-produtos |
+    |---|---|
+    | `order.created` | uma **SAÍDA** de estoque para cada item do pedido |
+    | `order.cancelled` | uma **ENTRADA** de estoque (devolução) para cada item |
+
+    Cada movimentação é enviada com `eventId = "<eventId>:<productId>"`. O ms-produtos tem índice único nesse
+    campo e responde `200 duplicate: true` quando a mesma movimentação chega de novo, sem alterar o estoque.
+  contact:
+    name: Equipe Conecta Store (PJBL)
+  license:
+    name: MIT
+
+defaultContentType: application/json
+
+tags:
+  - name: pedidos
+    description: Eventos do ciclo de vida do pedido.
+
+servers:
+  azure:
+    url: 'https://{storageAccount}.queue.core.windows.net'
+    protocol: https
+    description: |
+      Azure Storage Queue da conta de armazenamento do projeto. O ms-pedidos usa a connection string da conta
+      (variável `QUEUE_CONNECTION_STRING`); a Azure Function lê a mesma fila pela configuração `AzureWebJobsStorage`.
+    variables:
+      storageAccount:
+        description: Nome da conta de armazenamento.
+        default: stconectastore
+  local:
+    url: 'http://127.0.0.1:10001/devstoreaccount1'
+    protocol: http
+    description: |
+      Azurite (emulador local do Azure Storage). Use `QUEUE_CONNECTION_STRING=UseDevelopmentStorage=true`.
+
+channels:
+  order-events:
+    description: |
+      Fila única com todos os eventos de pedido. O tipo de cada mensagem vem no campo `type`.
+
+      O corpo da mensagem é o JSON do evento (UTF-8) codificado em **Base64**, que é o formato esperado por padrão
+      pelo gatilho de fila do Azure Functions. Para ler uma mensagem direto da fila é preciso decodificar o Base64 antes.
+    bindings:
+      x-azure-storage-queue:
+        queueName: order-events
+        messageEncoding: base64
+        deliveryGuarantee: at-least-once
+        consumer:
+          function: processOrderEvent
+          batchSize: 8
+          visibilityTimeout: '00:00:10'
+          maxDequeueCount: 5
+          poisonQueue: order-events-poison
+    subscribe:
+      operationId: receiveOrderEvent
+      summary: Eventos que o ms-pedidos publica e que os consumidores recebem.
+      description: |
+        No AsyncAPI 2.x, `subscribe` descreve o que **quem consome** recebe desta aplicação, ou seja, o que o ms-pedidos publica.
+
+        Quem consome hoje é a Azure Function `processOrderEvent` (gatilho de fila). Tratamento de erro do consumidor:
+
+        - mensagem que não bate com este contrato: registra no log e descarta;
+        - ms-produtos respondeu 404 ou 409 (produto não existe mais ou estoque insuficiente): registra um aviso e não tenta de novo;
+        - erro de rede, 5xx ou 429: relança o erro, e o runtime entrega a mensagem de novo. Depois de 5 tentativas
+          (`maxDequeueCount`), a mensagem vai para a fila `order-events-poison`.
+      tags:
+        - name: pedidos
+      message:
+        oneOf:
+          - $ref: '#/components/messages/OrderCreated'
+          - $ref: '#/components/messages/OrderCancelled'
+
+components:
+  messages:
+    OrderCreated:
+      name: order.created
+      title: Pedido criado
+      summary: Um pedido novo foi gravado (status PENDENTE).
+      description: |
+        Publicado quando `POST /orders` cria um pedido. O consumidor registra uma **SAÍDA** de estoque por item.
+      contentType: application/json
+      tags:
+        - name: pedidos
+      payload:
+        $ref: '#/components/schemas/OrderCreatedEvent'
+      examples:
+        - name: pedidoCriado
+          summary: Pedido com dois itens
+          payload:
+            eventId: 0b6f3c52-8a41-4f0e-9a57-3d2c1b0a9e8d
+            type: order.created
+            version: 1
+            source: ms-pedidos
+            occurredAt: '2025-06-10T14:30:00.000Z'
+            correlationId: 5d1c7a90-2b7e-4d55-8f0a-6c1e2d3f4a5b
+            data:
+              orderId: 7f9c2b1e-4d3a-4c8e-9b2f-1a2b3c4d5e6f
+              customerName: Ana Souza
+              customerEmail: ana@exemplo.com
+              status: PENDENTE
+              total: 56.3
+              items:
+                - productId: c0ffee00-1111-4222-8333-444455556666
+                  productName: Café torrado 500g
+                  quantity: 2
+                  unitPrice: 24.9
+                - productId: badc0de0-7777-4888-9999-aaaabbbbcccc
+                  productName: Filtro de papel 103
+                  quantity: 1
+                  unitPrice: 6.5
+
+    OrderCancelled:
+      name: order.cancelled
+      title: Pedido cancelado
+      summary: Um pedido passou para o status CANCELADO.
+      description: |
+        Publicado quando `PATCH /orders/{id}/status` leva o pedido para `CANCELADO` (a partir de `PENDENTE` ou `PAGO`).
+        O consumidor registra uma **ENTRADA** de estoque por item, devolvendo o que tinha sido baixado.
+
+        O ms-pedidos usa concorrência otimista na mudança de status, então dois cancelamentos simultâneos do mesmo
+        pedido geram **um único** evento.
+      contentType: application/json
+      tags:
+        - name: pedidos
+      payload:
+        $ref: '#/components/schemas/OrderCancelledEvent'
+      examples:
+        - name: pedidoCancelado
+          summary: Cancelamento do pedido do exemplo anterior
+          payload:
+            eventId: 9e2d4b7a-1c3f-4a6b-8d5e-7f0a1b2c3d4e
+            type: order.cancelled
+            version: 1
+            source: ms-pedidos
+            occurredAt: '2025-06-10T15:05:42.000Z'
+            correlationId: 2a7f9c1d-6e4b-4b3a-9d8c-0f1e2d3c4b5a
+            data:
+              orderId: 7f9c2b1e-4d3a-4c8e-9b2f-1a2b3c4d5e6f
+              customerName: Ana Souza
+              customerEmail: ana@exemplo.com
+              status: CANCELADO
+              total: 56.3
+              items:
+                - productId: c0ffee00-1111-4222-8333-444455556666
+                  productName: Café torrado 500g
+                  quantity: 2
+                  unitPrice: 24.9
+                - productId: badc0de0-7777-4888-9999-aaaabbbbcccc
+                  productName: Filtro de papel 103
+                  quantity: 1
+                  unitPrice: 6.5
+
+  schemas:
+    OrderCreatedEvent:
+      allOf:
+        - $ref: '#/components/schemas/OrderEventEnvelope'
+        - type: object
+          properties:
+            type:
+              type: string
+              const: order.created
+              description: Tipo do evento.
+
+    OrderCancelledEvent:
+      allOf:
+        - $ref: '#/components/schemas/OrderEventEnvelope'
+        - type: object
+          properties:
+            type:
+              type: string
+              const: order.cancelled
+              description: Tipo do evento.
+
+    OrderEventEnvelope:
+      type: object
+      description: Envelope comum a todos os eventos de pedido.
+      required:
+        - eventId
+        - type
+        - version
+        - source
+        - occurredAt
+        - correlationId
+        - data
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Identificador único do evento. Use para idempotência (a mesma mensagem pode chegar mais de uma vez).
+        type:
+          type: string
+          enum:
+            - order.created
+            - order.cancelled
+          description: Tipo do evento.
+        version:
+          type: integer
+          const: 1
+          description: Versão do formato do evento. Só muda se o contrato mudar de forma incompatível.
+        source:
+          type: string
+          const: ms-pedidos
+          description: Serviço que publicou o evento.
+        occurredAt:
+          type: string
+          format: date-time
+          description: Momento em que o fato aconteceu (ISO 8601, UTC).
+        correlationId:
+          type: string
+          description: Valor do `x-correlation-id` da requisição HTTP que gerou o evento. Repasse nas chamadas seguintes.
+        data:
+          $ref: '#/components/schemas/OrderEventData'
+
+    OrderEventData:
+      type: object
+      description: Retrato do pedido no momento do evento.
+      required:
+        - orderId
+        - customerName
+        - customerEmail
+        - status
+        - total
+        - items
+      properties:
+        orderId:
+          type: string
+          format: uuid
+          description: Identificador do pedido.
+        customerName:
+          type: string
+          description: Nome do cliente.
+        customerEmail:
+          type: string
+          format: email
+          description: E-mail do cliente (sempre em minúsculas).
+        status:
+          type: string
+          enum:
+            - PENDENTE
+            - PAGO
+            - ENVIADO
+            - ENTREGUE
+            - CANCELADO
+          description: Status do pedido depois do fato (`PENDENTE` em `order.created`, `CANCELADO` em `order.cancelled`).
+        total:
+          type: number
+          description: Valor total do pedido, com 2 casas decimais.
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          description: Itens do pedido (de 1 a 20, sem produto repetido).
+          items:
+            $ref: '#/components/schemas/OrderEventItem'
+
+    OrderEventItem:
+      type: object
+      required:
+        - productId
+        - productName
+        - quantity
+        - unitPrice
+      properties:
+        productId:
+          type: string
+          description: Identificador do produto no ms-produtos.
+        productName:
+          type: string
+          description: Nome do produto no momento da compra.
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 999
+          description: Quantidade comprada. É a quantidade movimentada no estoque.
+        unitPrice:
+          type: number
+          description: Preço unitário no momento da compra.
