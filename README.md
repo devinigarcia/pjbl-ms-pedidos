@@ -4,8 +4,8 @@ Microserviço de **Pedidos** do **Conecta Store**, o sistema que montamos para o
 
 Este serviço cuida do ciclo de vida dos pedidos: cria, lista, edita, muda o status e exclui. Os dados ficam no **Azure SQL** e, sempre que um pedido é criado ou cancelado, o serviço publica um **evento** numa fila para que o estoque seja atualizado em outro microserviço, sem que um chame o outro diretamente.
 
-- Swagger (HTTP): `{{URL_MS_PEDIDOS}}/docs`
-- Documentação dos eventos (AsyncAPI): `{{URL_MS_PEDIDOS}}/events/docs`
+- Swagger (HTTP): `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/docs`
+- Documentação dos eventos (AsyncAPI): `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/events/docs`
 
 ## Sumário
 
@@ -427,22 +427,22 @@ Os testes só mexem em registros que eles mesmos criam (marcados com um texto ú
 A imagem é multi-stage (`node:22-alpine`): a primeira etapa instala tudo e compila; a final leva só `dist/`, as dependências de produção e o `docs/asyncapi.yaml`, roda com o usuário `node` (sem root) e tem `HEALTHCHECK` em `/health`.
 
 ```bash
-docker build -t {{DOCKERHUB_USER}}/pjbl-ms-pedidos:v1 .
+docker build -t vinigarciaa/pjbl-ms-pedidos:v1 .
 docker login
-docker push {{DOCKERHUB_USER}}/pjbl-ms-pedidos:v1
+docker push vinigarciaa/pjbl-ms-pedidos:v1
 ```
 
 Para rodar a imagem:
 
 ```bash
 # modo memória
-docker run --rm -p 3002:3002 {{DOCKERHUB_USER}}/pjbl-ms-pedidos:v1
+docker run --rm -p 3002:3002 vinigarciaa/pjbl-ms-pedidos:v1
 
 # com as variáveis do seu .env (SQL, fila etc.)
-docker run --rm -p 3002:3002 --env-file .env {{DOCKERHUB_USER}}/pjbl-ms-pedidos:v1
+docker run --rm -p 3002:3002 --env-file .env vinigarciaa/pjbl-ms-pedidos:v1
 ```
 
-**Sobre o nome da imagem.** O enunciado dá como exemplo `dockerhubuser/pjbl/bff:v1` (registro/repositório/imagem). O Docker Hub, porém, não aceita namespace aninhado: o nome precisa ser `usuario/repositorio:tag`, com um nível só. Por isso o `pjbl` virou prefixo do nome do repositório: `{{DOCKERHUB_USER}}/pjbl-ms-pedidos:v1` (e, nos outros projetos, `pjbl-bff` e `pjbl-ms-produtos`).
+**Sobre o nome da imagem.** O enunciado dá como exemplo `dockerhubuser/pjbl/bff:v1` (registro/repositório/imagem). O Docker Hub, porém, não aceita namespace aninhado: o nome precisa ser `usuario/repositorio:tag`, com um nível só. Por isso o `pjbl` virou prefixo do nome do repositório: `vinigarciaa/pjbl-ms-pedidos:v1` (e, nos outros projetos, `pjbl-bff` e `pjbl-ms-produtos`).
 
 **Publicação automática.** O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) tem dois jobs:
 
@@ -463,11 +463,11 @@ Para o segundo job funcionar, cadastre no repositório (Settings → Secrets and
 
 | O quê | Endereço |
 |---|---|
-| Swagger do ms-pedidos | `{{URL_MS_PEDIDOS}}/docs` |
-| Documentação dos eventos (AsyncAPI) | `{{URL_MS_PEDIDOS}}/events/docs` |
-| OpenAPI (JSON) | `{{URL_MS_PEDIDOS}}/openapi.json` |
-| Saúde do serviço | `{{URL_MS_PEDIDOS}}/health` |
-| Imagem no Docker Hub | `https://hub.docker.com/r/{{DOCKERHUB_USER}}/pjbl-ms-pedidos` |
+| Swagger do ms-pedidos | `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/docs` |
+| Documentação dos eventos (AsyncAPI) | `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/events/docs` |
+| OpenAPI (JSON) | `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/openapi.json` |
+| Saúde do serviço | `https://ms-pedidos.agreeablesand-8dc3837e.brazilsouth.azurecontainerapps.io/health` |
+| Imagem no Docker Hub | `https://hub.docker.com/r/vinigarciaa/pjbl-ms-pedidos` |
 | Código | `https://github.com/devinigarcia/pjbl-ms-pedidos` |
 | Aplicação (frontend) | `https://devinigarcia.github.io/pjbl-microfrontend` |
 
