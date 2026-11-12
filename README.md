@@ -475,4 +475,7 @@ Os outros repositórios do projeto: `pjbl-microfrontend`, `pjbl-bff`, `pjbl-ms-p
 
 ## Alunos
 
-{{ALUNOS}}
+- Arthur Ambrozewicz Cidral
+- Erick Marlon Barbieri da Silva
+- Luan Alberti Estevinho
+- Vinícius de Oliveira Garcia
